@@ -1,7 +1,6 @@
 package com.example.examplemod;
 
 import com.mojang.logging.LogUtils;
-import net.minecraft.client.Minecraft;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
@@ -17,6 +16,7 @@ import net.minecraft.world.level.material.MapColor;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
+import net.minecraftforge.event.entity.EntityAttributeCreationEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -37,8 +37,10 @@ public class ExampleMod {
 
     public static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(ForgeRegistries.BLOCKS, MODID);
     public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, MODID);
-    public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);
-    public static final DeferredRegister<EntityType<?>> ENTITY_TYPES = DeferredRegister.create(ForgeRegistries.ENTITY_TYPES, MODID);
+    public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS =
+            DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);
+    public static final DeferredRegister<EntityType<?>> ENTITY_TYPES =
+            DeferredRegister.create(ForgeRegistries.ENTITY_TYPES, MODID);
 
     public static final RegistryObject<Block> EXAMPLE_BLOCK = BLOCKS.register("example_block",
             () -> new Block(BlockBehaviour.Properties.of().mapColor(MapColor.STONE)));
@@ -59,6 +61,13 @@ public class ExampleMod {
                     .updateInterval(10)
                     .build("shuriken_projectile"));
 
+    public static final RegistryObject<EntityType<CompanionEntity>> COMPANION = ENTITY_TYPES.register(
+            "companion",
+            () -> EntityType.Builder.<CompanionEntity>of(CompanionEntity::new, MobCategory.CREATURE)
+                    .sized(0.6F, 1.8F)
+                    .clientTrackingRange(10)
+                    .build("companion"));
+
     public static final RegistryObject<CreativeModeTab> EXAMPLE_TAB = CREATIVE_MODE_TABS.register("example_tab",
             () -> CreativeModeTab.builder()
                     .withTabsBefore(CreativeModeTabs.COMBAT)
@@ -71,10 +80,13 @@ public class ExampleMod {
     public ExampleMod(FMLJavaModLoadingContext context) {
         IEventBus modEventBus = context.getModEventBus();
         modEventBus.addListener(this::commonSetup);
+        modEventBus.addListener(this::onEntityAttributes);
+
         BLOCKS.register(modEventBus);
         ITEMS.register(modEventBus);
         ENTITY_TYPES.register(modEventBus);
         CREATIVE_MODE_TABS.register(modEventBus);
+
         MinecraftForge.EVENT_BUS.register(this);
         modEventBus.addListener(this::addCreative);
         context.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
@@ -86,6 +98,10 @@ public class ExampleMod {
             LOGGER.info("DIRT BLOCK >> {}", ForgeRegistries.BLOCKS.getKey(Blocks.DIRT));
         LOGGER.info(Config.magicNumberIntroduction + Config.magicNumber);
         Config.items.forEach((item) -> LOGGER.info("ITEM >> {}", item.toString()));
+    }
+
+    private void onEntityAttributes(EntityAttributeCreationEvent event) {
+        event.put(COMPANION.get(), CompanionEntity.createAttributes().build());
     }
 
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
@@ -102,10 +118,16 @@ public class ExampleMod {
     public static class ClientModEvents {
         @SubscribeEvent
         public static void onClientSetup(FMLClientSetupEvent event) {
-            event.enqueueWork(() -> net.minecraft.client.renderer.entity.EntityRenderers.register(
-                    SHURIKEN_PROJECTILE.get(),
-                    net.minecraft.client.renderer.entity.ThrownItemRenderer::new
-            ));
+            event.enqueueWork(() -> {
+                net.minecraft.client.renderer.entity.EntityRenderers.register(
+                        SHURIKEN_PROJECTILE.get(),
+                        net.minecraft.client.renderer.entity.ThrownItemRenderer::new
+                );
+                net.minecraft.client.renderer.entity.EntityRenderers.register(
+                        COMPANION.get(),
+                        CompanionRenderer::new
+                );
+            });
         }
     }
 }
